@@ -327,9 +327,8 @@ oledimage = None
 oleddraw = None
 oledwidth = 128
 oledheight = 32
+oledautoupdate = True
 
-oledtimer = None
-oledlock = threading.Lock()
 
 vl53l0x = None
 
@@ -560,24 +559,19 @@ def initOLEDScreen():
     global oleddraw
 
     if oleddisp == None:
-        from board import SCL, SDA
-        import busio
+        from luma.core.interface.serial import i2c
+        from luma.core.render import canvas
+        from luma.oled.device import ssd1306
         from PIL import Image, ImageDraw, ImageFont
-        import adafruit_ssd1306
 
-        i2c = busio.I2C(SCL, SDA)
-
-        oleddisp = adafruit_ssd1306.SSD1306_I2C(oledwidth, oledheight, i2c)
-
-        oleddisp.fill(0)
-        oleddisp.show()
+        serial = i2c(port=1, address=0x3C)
+        oleddisp = ssd1306(serial, width=oledwidth, height=oledheight)
 
         oledfont = ImageFont.load_default()
-
         oledimage = Image.new('1', (oledwidth, oledheight))
-
         oleddraw = ImageDraw.Draw(oledimage)   
 
+        oleddisp.display(oledimage)
 
 # Address 0x3c
 def displayTextOled(line1, line2=""):
@@ -597,32 +591,18 @@ def displayTextOled(line1, line2=""):
     oleddraw.text((0, 0), line1, font=oledfont, fill=255)
     oleddraw.text((0, 15), line2, font=oledfont, fill=255)
 
-    oleddisp.image(oledimage)
-    oleddisp.show()
+    updateScreen()
+
+def autoUpdate(autoupdate):
+    global oledautoupdate
+
+    oledautoupdate = bool(autoupdate)
 
 def updateScreen():
     global oleddisp
-    global oledfont
     global oledimage
-    global oleddraw
 
-    global oledtimer
-
-    oledlock.acquire(True)
-    oleddisp.image(oledimage)
-    oledlock.release()
-    
-    oleddisp.show()
-    oledtimer = None
-
-def scheduleUpdateScreen():
-    global oledtimer
-
-    oledlock.acquire(True)
-    if oledtimer == None:
-        oledtimer = threading.Timer(0.05, updateScreen)
-        oledtimer.start()   
-    oledlock.release()
+    oleddisp.display(oledimage)
 
 fillcolor = 255
 strokecolor = 255
@@ -652,55 +632,42 @@ def noStroke(color):
     strokecolor = None
 
 def drawPoint(x, y):
-    global oleddisp
-    global oledfont
-    global oledimage
     global oleddraw
     global strokecolor
-
+    
     initOLEDScreen()
 
-    oledlock.acquire(True)
     oleddraw.point((x, y), fill=strokecolor)
-    oledlock.release()
 
-    scheduleUpdateScreen()
+    global oledautoupdate
+    if oledautoupdate:
+        updateScreen()
 
 def drawLine(x0, y0, x1, y1):
-    global oleddisp
-    global oledfont
-    global oledimage
     global oleddraw
     global strokecolor
 
     initOLEDScreen()
 
-    oledlock.acquire(True)
     oleddraw.line((x0, y0, x1, y1), fill=strokecolor)
-    oledlock.release()
 
-    scheduleUpdateScreen()
+    global oledautoupdate
+    if oledautoupdate:
+        updateScreen()
 
 def drawRectangle(x0, y0, width, height):
-    global oleddisp
-    global oledfont
-    global oledimage
     global oleddraw
     global fillcolor
     global strokecolor
 
     initOLEDScreen()
-
-    oledlock.acquire(True)
     oleddraw.rectangle((x0, y0, x0 + width, y0 + height), fill=fillcolor, outline=strokecolor)
-    oledlock.release()
 
-    scheduleUpdateScreen()
+    global oledautoupdate
+    if oledautoupdate:
+        updateScreen()
 
 def drawCircle(x0, y0, diameter):
-    global oleddisp
-    global oledfont
-    global oledimage
     global oleddraw
     global fillcolor
     global strokecolor
@@ -715,26 +682,22 @@ def drawCircle(x0, y0, diameter):
     boundx1 = x0 + radius
     boundy1 = y0 + radius
 
-    oledlock.acquire(True)
     oleddraw.ellipse((boundx0, boundy0, boundx1, boundy1), fill=fillcolor, outline=strokecolor)
-    oledlock.release()
 
-    scheduleUpdateScreen()
+    global oledautoupdate
+    if oledautoupdate:
+        updateScreen()
 
 def clearScreen():
-    global oleddisp
-    global oledfont
-    global oledimage
     global oleddraw
 
     initOLEDScreen()
 
-    oledlock.acquire(True)
     oleddraw.rectangle((0, 0, oledwidth, oledheight), outline=0, fill=0)
-    oledlock.release()
 
-    scheduleUpdateScreen()
-
+    global oledautoupdate
+    if oledautoupdate:
+        updateScreen()
 
 def displayText16x2(line1, line2=""):
     global screenLine1
@@ -1128,6 +1091,7 @@ def readAccelBMI160():
 
         return [round(acc_x, 2), round(acc_y, 2), round(acc_z, 2)]
     except:
+        enabledBMI160 = False
         return [0, 0, 0]
 
 def readAcceleration(axis):
@@ -1191,6 +1155,7 @@ def readGyroBMI160():
   
         return [x, y, z]
     except:
+        enabledBMI160 = False
         return [0, 0, 0]
 
 def twos_comp(val, bits):
@@ -1222,6 +1187,7 @@ def readTemperatureBMI160(pin):
     
         return temp
     except:
+        enabledBMI160 = False
         return 0
 
 ACC_I2C_ADDR = 0x1D
@@ -1284,6 +1250,7 @@ def readMagnetometerLSM303C():
 
         return [X, Y, Z]
     except:
+        enabledLSM303C = False
         return [0, 0, 0]
  
 def readMagneticForce(axis):

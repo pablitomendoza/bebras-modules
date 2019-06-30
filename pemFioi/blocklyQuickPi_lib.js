@@ -2,6 +2,9 @@
 
 // This is a template of library for use with quickAlgo.
 var getContext = function (display, infos, curLevel) {
+
+    window.quickAlgoInterface.stepDelayMin = 0.0001;
+
     // Local language strings for each language
     var introControls = null;
     var localLanguageStrings = {
@@ -33,6 +36,8 @@ var getContext = function (display, infos, curLevel) {
                 drawRectangle: "Draw Rectangle (x₀,y₀) %1 %2 (width,height) %3  %4",
                 drawCircle: "Draw circle (x₀,y₀) %1 %2 Diameter %3",
                 clearScreen: "Clear entiere screen",
+                updateScreen: "Update drawins to the screen",
+                autoUpdate: "Screen autoupdate mode",
 
                 fill: "Set fill color", 
                 noFill: "Do not fill shapes",
@@ -94,6 +99,8 @@ var getContext = function (display, infos, curLevel) {
                 drawRectangle: "drawRectangle",
                 drawCircle: "drawCircle",
                 clearScreen: "clearScreen",
+                updateScreen: "updateScreen",
+                autoUpdate: "autoUpdate",
 
                 fill: "fill", 
                 noFill: "noFill",
@@ -142,6 +149,8 @@ var getContext = function (display, infos, curLevel) {
                 drawRectangle: "drawRectangle(x0, y0, width, height)",
                 drawCircle: "drawCircle(x0, y0, diameter)",
                 clearScreen: "clearScreen()",
+                updateScreen: "updateScreen()",
+                autoUpdate: "autoUpdate(auto)",
 
                 fill: "fill(color)", 
                 noFill: "noFill()",
@@ -286,6 +295,8 @@ var getContext = function (display, infos, curLevel) {
                 drawRectangle: "drawRectangle",
                 drawCircle: "drawCircle",
                 clearScreen: "clearScreen",
+                updateScreen: "updateScreen",
+                autoUpdate: "autoUpdate",
 
                 fill: "fill", 
                 noFill: "noFill",
@@ -2905,18 +2916,17 @@ var getContext = function (display, infos, curLevel) {
         var imgx = sensor.drawInfo.x + imgw / 3;
         var imgy = sensor.drawInfo.y + (sensor.drawInfo.height / 2) - (imgh / 2);
 
-        var state1x = imgx + (imgw / 2);
-        var state1y = imgy + imgh + (imgh * .2);
+        var state1x = imgx + imgw + (imgw * .20);
+        var state1y = imgy + imgh / 3;
 
-        var portx = imgx + imgw;
-        var porty = imgy + imgh / 3;
+        var portx = state1x;
+        var porty = imgy;
 
         var namex = sensor.drawInfo.x + (sensor.drawInfo.height / 2);
         var namey = sensor.drawInfo.y + (imgh * 0.20);
 
-
         var portsize = sensor.drawInfo.height * 0.10;
-        var statesize = sensor.drawInfo.height * 0.08;
+        var statesize = sensor.drawInfo.height * 0.09;
         var namesize = sensor.drawInfo.height * 0.10;
 
         if (!sensor.focusrect || !sensor.focusrect.paper.canvas)
@@ -3161,10 +3171,6 @@ var getContext = function (display, infos, curLevel) {
                 sensor.stateText = null;
             }
 
-            if (sensor.stateText2) {
-                sensor.stateText2.remove();
-                sensor.stateText2 = null;
-            }
 
             imgw = sensor.drawInfo.width / 1.3;
             imgh = sensor.drawInfo.height / 1.2;
@@ -3279,7 +3285,6 @@ var getContext = function (display, infos, curLevel) {
                 var statex = imgx + (imgw * .13);
 
                 var statey = imgy + (imgh * .4);
-                var state2y = statey + (imgh * .2);
 
                 if (sensor.state.line1.length > 16)
                     sensor.state.line1 = sensor.state.line1.substring(0, 16);
@@ -3287,11 +3292,9 @@ var getContext = function (display, infos, curLevel) {
                 if (sensor.state.line2.length > 16)
                     sensor.state.line2 = sensor.state.line2.substring(0, 16);
 
-                sensor.stateText = paper.text(statex, statey, sensor.state.line1);
-                sensor.stateText2 = paper.text(statex, state2y, sensor.state.line2);
+                sensor.stateText = paper.text(statex, statey, sensor.state.line1 + "\n" + sensor.state.line2);
 
                 sensor.stateText.attr("")
-
             }
         } else if (sensor.type == "temperature") {
             if (sensor.stateText)
@@ -3652,7 +3655,7 @@ var getContext = function (display, infos, curLevel) {
 
             if (sensor.state) {
                 try {
-                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + " Y: " + sensor.state[1] + " Z: " + sensor.state[2]);
+                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + "\nY: " + sensor.state[1] + "\nZ: " + sensor.state[2]);
                 } catch (Err)
                 {
                     var a = 1;
@@ -3675,7 +3678,7 @@ var getContext = function (display, infos, curLevel) {
                 sensor.stateText.remove();
 
             if (sensor.state) {
-                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + " Y: " + sensor.state[1] + " Z: " + sensor.state[2]);
+                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + "\nY: " + sensor.state[1] + "\nZ: " + sensor.state[2]);
             }
         } else if (sensor.type == "magnetometer") {
             if (sensor.stateText)
@@ -3712,7 +3715,7 @@ var getContext = function (display, infos, curLevel) {
                 sensor.stateText.remove();
 
             if (sensor.state) {
-                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + " Y: " + sensor.state[1] + " Z: " + sensor.state[2]);
+                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + "\nY: " + sensor.state[1] + "\nZ: " + sensor.state[2]);
             }
         } else if (sensor.type == "sound") {
             if (sensor.stateText)
@@ -4076,6 +4079,9 @@ var getContext = function (display, infos, curLevel) {
 
         if (sensor.stateText) {
             sensor.stateText.attr({ "font-size": statesize + "px", 'text-anchor': 'start', 'font-weight': 'bold', fill: "gray" });
+            var b = sensor.stateText._getBBox();
+            sensor.stateText.translate(0,b.height/2);
+
             try {
             sensor.stateText.node.style = "-moz-user-select: none; -webkit-user-select: none;";
             } catch (err) {
@@ -4083,15 +4089,11 @@ var getContext = function (display, infos, curLevel) {
             }
         }
 
-        if (sensor.stateText2) {
-            sensor.stateText2.attr({ "font-size": statesize + "px", 'text-anchor': 'start', 'font-weight': 'bold', fill: "gray" });
-            sensor.stateText2.node.style = "-moz-user-select: none; -webkit-user-select: none;";
-        }
-
-
         sensor.portText = paper.text(portx, porty, sensor.port);
         sensor.portText.attr({ "font-size": portsize + "px", 'text-anchor': 'start', fill: "gray" });
         sensor.portText.node.style = "-moz-user-select: none; -webkit-user-select: none;";
+        var b = sensor.portText._getBBox();
+        sensor.portText.translate(0,b.height/2);
 
         if (sensor.nameText) {
             sensor.nameText.remove();
@@ -4792,6 +4794,57 @@ var getContext = function (display, infos, curLevel) {
         }
     };
 
+
+    context.quickpi.updateScreen = function(callback) {
+        if (!context.display || context.autoGrading || context.offLineMode) {
+            /*
+            var sensor = findSensorByType("screen");
+            if (sensor && sensor.canvas)
+            {
+                var ctx = sensor.canvas.getContext('2d');
+ 
+                ctx.clearRect(0, 0, sensor.canvas.width, sensor.canvas.height);
+            }
+            */
+           
+            context.waitDelay(callback);
+        } else {
+            var cb = context.runner.waitCallback(callback);
+
+            var command = "updateScreen()";
+            context.quickPiConnection.sendCommand(command, function () {
+                cb();
+            });
+        }
+    };
+
+
+    context.quickpi.autoUpdate = function(autoupdate, callback) {
+        if (!context.display || context.autoGrading || context.offLineMode) {
+            /*
+            var sensor = findSensorByType("screen");
+            if (sensor && sensor.canvas)
+            {
+                var ctx = sensor.canvas.getContext('2d');
+
+                context.noFill = false;
+                if (color)
+                    ctx.fillStyle = "black";
+                else
+                    ctx.fillStyle = "white";  
+            }*/
+
+            context.waitDelay(callback);
+        } else {
+            var cb = context.runner.waitCallback(callback);
+
+            var command = "autoUpdate(\"" + (autoupdate ? "True" : "False") + "\")";
+            context.quickPiConnection.sendCommand(command, function () {
+                cb();
+            });
+        }
+    };
+
     context.quickpi.fill = function(color, callback) {
         if (!context.display || context.autoGrading || context.offLineMode) {
             var sensor = findSensorByType("screen");
@@ -5399,6 +5452,20 @@ var getContext = function (display, infos, curLevel) {
 
                 {
                     name: "clearScreen"
+                },
+                {
+                    name: "updateScreen"
+                },
+                {
+                    name: "autoUpdate", params: ["Boolean"], blocklyJson: {
+                        "args0": [
+                            { "type": "input_value", "name": "PARAM_0"},
+                        ],
+                    },
+                    blocklyXml: "<block type='autoUpdate'>" +
+                    "<value name='PARAM_0'><shadow type='logic_boolean'></shadow></value>" +
+                    "</block>"
+
                 },
                 {
                     name: "fill", params: ["Number"], blocklyJson: {
