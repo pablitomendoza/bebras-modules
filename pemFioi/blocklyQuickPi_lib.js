@@ -212,6 +212,9 @@ var getContext = function (display, infos, curLevel) {
                         <button type="button" id="pichangehat" class="btn">
                             <span class="fas fa-hat-wizard"></span><span>Change Board</span></span></span>
                         </button>
+                        <button type="button" id="pihatsetup" class="btn">
+                            <span class="fas fa-cog"></span><span>Config</span></span></span>
+                        </button>
                     </span>
                 </div>`,
                 connectionDialogHTML: `
@@ -391,7 +394,7 @@ var getContext = function (display, infos, curLevel) {
             }
 
             if (lastTurn) {
-                context.success = false;
+                context.success = true;
                 if (context.autoGrading)
                     context.doNotStartGrade = false;
                 else
@@ -1954,6 +1957,53 @@ var getContext = function (display, infos, curLevel) {
         });
 
 
+        $('#pihatsetup').click(function () {
+
+            var command = "getBuzzerAudioOutput()";
+            context.quickPiConnection.sendCommand(command, function(val) {
+                var buzzerstate = parseInt(val);
+
+                window.displayHelper.showPopupDialog(`
+                <div class="content connectPi qpi">
+                <div class="panel-heading">
+                    <h2 class="sectionTitle">
+                        <span class="iconTag"><i class="icon fas fa-list-ul"></i></span>
+                        QuickPi Hat Settings
+                    </h2>
+                    <div class="exit" id="picancel"><i class="icon fas fa-times"></i></div>
+                </div>
+                <div class="panel-body">
+                    <div>
+                        <input type="checkbox" id="buzzeraudio" value="buzzeron"> Output audio trought audio buzzer<br>
+                    </div>
+
+                    <div class="inlineButtons">
+                        <button id="pisetupok" class="btn"><i class="fas fa-cog icon"></i>Set</button>
+                </div>  
+                </div>
+            </div>`);
+
+                $('#buzzeraudio').prop('checked', buzzerstate ? true : false);
+
+                
+                $('#picancel').click(function () {
+                    $('#popupMessage').hide();
+                    window.displayHelper.popupMessageShown = false;
+                });
+
+                $('#pisetupok').click(function () {
+                    $('#popupMessage').hide();
+                    window.displayHelper.popupMessageShown = false;
+
+                    var radioValue = $('#buzzeraudio').is(":checked");
+
+                    var command = "setBuzzerAudioOutput(" + (radioValue ? "True" : "False") + ")";
+                    context.quickPiConnection.sendCommand(command, function(x) {});
+                });
+            });
+        });
+
+
         $('#piinstall').click(function () {
             context.blocklyHelper.reportValues = false;
 
@@ -2299,6 +2349,12 @@ var getContext = function (display, infos, curLevel) {
         $('#piinstallcheck').hide();
         $('#piinstallprogresss').hide();
         $('#piinstallui').show();
+
+        if (context.board == "quickpi")
+            $('#pihatsetup').show();
+        else
+            $('#pihatsetup').hide();
+
         $('#piconnect').css('background-color', '#F9A423');
 
         $('#piinstall').css('background-color', "#488FE1");
@@ -2317,6 +2373,7 @@ var getContext = function (display, infos, curLevel) {
         $('#piinstallcheck').hide();
         $('#piinstallprogresss').hide();
         $('#piinstallui').hide();
+        $('#pihatsetup').hide();
         $('#piconnect').css('background-color', '#F9A423');
         $('#piconnecttext').show();
     }
@@ -2916,7 +2973,7 @@ var getContext = function (display, infos, curLevel) {
         var imgx = sensor.drawInfo.x + imgw / 3;
         var imgy = sensor.drawInfo.y + (sensor.drawInfo.height / 2) - (imgh / 2);
 
-        var state1x = imgx + imgw + (imgw * .20);
+        var state1x = imgx + imgw + (imgw * .05);
         var state1y = imgy + imgh / 3;
 
         var portx = state1x;
@@ -4078,14 +4135,12 @@ var getContext = function (display, infos, curLevel) {
             sensor.portText.remove();
 
         if (sensor.stateText) {
-            sensor.stateText.attr({ "font-size": statesize + "px", 'text-anchor': 'start', 'font-weight': 'bold', fill: "gray" });
-            var b = sensor.stateText._getBBox();
-            sensor.stateText.translate(0,b.height/2);
-
             try {
-            sensor.stateText.node.style = "-moz-user-select: none; -webkit-user-select: none;";
+                sensor.stateText.attr({ "font-size": statesize + "px", 'text-anchor': 'start', 'font-weight': 'bold', fill: "gray" });
+                var b = sensor.stateText._getBBox();
+                sensor.stateText.translate(0,b.height/2);
+                sensor.stateText.node.style = "-moz-user-select: none; -webkit-user-select: none;";
             } catch (err) {
-                var a = 1;
             }
         }
 
