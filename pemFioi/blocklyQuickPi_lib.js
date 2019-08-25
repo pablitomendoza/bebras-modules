@@ -1018,7 +1018,7 @@ var getContext = function (display, infos, curLevel) {
             valueType: "boolean",
             selectorImages: ["stick.png"],
             gpiosNames: ["Up", "Down", "Left", "Right", "Center"],
-            gpios: [9, 10, 8, 11, 7],
+            gpios: [10, 9, 11, 8, 7],
             getPercentageFromState: function (state) {
                 if (state)
                     return 1;
@@ -1329,7 +1329,7 @@ var getContext = function (display, infos, curLevel) {
                 return state1 == state2;
             },
             getLiveState: function (sensor, callback) {
-                context.quickPiConnection.sendCommand("readMagnetometerLSM303C()", function(val) {
+                context.quickPiConnection.sendCommand("readMagnetometerLSM303C(False)", function(val) {
 
                     var array = JSON.parse(val);
                     callback(array);
@@ -1630,13 +1630,13 @@ var getContext = function (display, infos, curLevel) {
             window.displayHelper.showPopupDialog(strings.messages.connectionDialogHTML);
 
             if (context.offLineMode) {
-                $('#piconnectok').attr('disabled', false);
                 $('#pirelease').attr('disabled', true);
             }
             else {
-                $('#piconnectok').attr('disabled', true);
                 $('#pirelease').attr('disabled', false);
             }
+
+            $('#piconnectok').attr('disabled', true);
 
             $('#piconnectionlabel').hide();
 
@@ -1671,12 +1671,27 @@ var getContext = function (display, infos, curLevel) {
                 sessionStorage.connectionMethod = "WIFI";
             }
 
+            $('#piaddress').on('input', function (e) {
+
+                if (context.offLineMode)
+                {
+                    var content = $('#piaddress').val();
+
+                    if (content)
+                        $('#piconnectok').attr('disabled', false);
+                    else
+                        $('#piconnectok').attr('disabled', true);
+                }
+            });
+
+
             if (sessionStorage.pilist) {
                 populatePiList(JSON.parse(sessionStorage.pilist));
             }
 
             if (sessionStorage.raspberryPiIpAddress) {
                 $('#piaddress').val(sessionStorage.raspberryPiIpAddress);
+                $('#piaddress').trigger("input");
             }
 
             if (sessionStorage.schoolkey) {
@@ -1764,7 +1779,6 @@ var getContext = function (display, infos, curLevel) {
             });
 
             $('#piconusb').click(function () {
-                $('#piconnectionlabel').show();
                 if (!context.quickPiConnection.isConnected()) {
                     sessionStorage.connectionMethod = "USB";
                     $('#piconnectok').attr('disabled', true);
@@ -1857,6 +1871,7 @@ var getContext = function (display, infos, curLevel) {
 
                     if (first) {
                         $('#piaddress').val(jsonlist[i].ip);
+                        $('#piaddress').trigger("input");
                         first = false;
                         $('#pilist').prop('disabled', false);
                     }
@@ -5053,7 +5068,7 @@ var getContext = function (display, infos, curLevel) {
         }
     };
 
-    context.quickpi.computeCompassHeading = function (rotationType, callback) {
+    context.quickpi.computeCompassHeading = function (callback) {
         if (!context.display || context.autoGrading || context.offLineMode) {
             var state = context.getSensorState("magnetometer", "i2c");
 
@@ -5062,9 +5077,14 @@ var getContext = function (display, infos, curLevel) {
             var cb = context.runner.waitCallback(callback);
             var sensor = context.findSensor("magnetometer", "i2c");
             
-            findSensorDefinition(sensor).getLiveState(sensor, function(returnVal) {
+            context.quickPiConnection.sendCommand("readMagnetometerLSM303C()", function(returnVal) {
                 sensor.state = returnVal;
                 drawSensor(sensor);
+
+                returnVal = Math.atan2(sensor.state[0],sensor.state[1])*(180/Math.PI) + 180;
+
+                returnVal = Math.floor(returnVal);
+
                 cb(returnVal);
             });
         }

@@ -35,7 +35,7 @@ var getQuickPiConnection = function (userName, _onConnect, _onDisconnect) {
         this.pingsWithoutPong = 0;
         this.commandQueue = [];
         this.resultsCallback = null;
-        this.seq = Math.random() * 65536;
+        this.seq = Math.floor(Math.random() * 65536);
 
         this.wsSession = new WebSocket(url);
 
@@ -376,7 +376,7 @@ def normalizePin(pin):
 
 
 def cleanupPin(pin):
-    pi.set_mode(pin, pigpio.INPUT)
+        pi.set_mode(pin, pigpio.INPUT)
 
 def changePinState(pin, state):
     pin = normalizePin(pin)
@@ -568,6 +568,14 @@ def initOLEDScreen():
         from luma.oled.device import ssd1306
         from PIL import Image, ImageDraw, ImageFont
 
+        # Reset the screen
+        RESET=21
+        GPIO.setup(RESET, GPIO.OUT)
+        GPIO.output(RESET, 0)
+        time.sleep(0.01)
+        GPIO.output(RESET, 1)
+   
+
         serial = i2c(port=1, address=0x3C)
         oleddisp = ssd1306(serial, width=oledwidth, height=oledheight)
 
@@ -631,7 +639,7 @@ def stroke(color):
     else:
         strokecolor = 0
 
-def noStroke(color):
+def noStroke():
     global strokecolor
     strokecolor = None
 
@@ -759,10 +767,12 @@ def displayText16x2(line1, line2=""):
 
 def setServoAngle(pin, angle):
     pin = normalizePin(pin)
-    angle = int(angle)
 
-    pulsewidth = (angle * 11.11) + 500
-    pi.set_servo_pulsewidth(pin, pulsewidth)
+    if pin != 0:
+        angle = int(angle)
+
+        pulsewidth = (angle * 11.11) + 500
+        pi.set_servo_pulsewidth(pin, pulsewidth)
 
 def readGrovePiADC(pin):
     pin = normalizePin(pin)
@@ -1251,7 +1261,7 @@ def initLSM303C():
     bus.write_byte_data(ACC_I2C_ADDR, CTRL_REG1_A, 0xBF) # High resolution, 100Hz output, enable all three axis
 
 
-def readMagnetometerLSM303C():
+def readMagnetometerLSM303C(allowcalibration=True):
     global enabledLSM303C
     global compassOffset
     global compassScale
@@ -1264,8 +1274,9 @@ def readMagnetometerLSM303C():
         if compassOffset is None or compassScale is None:
             loadCompassCalibration()
 
-        if compassOffset is None or compassScale is None:
-            calibrateCompassGame()
+        if allowcalibration:
+            if compassOffset is None or compassScale is None:
+                calibrateCompassGame()
 
         bus = smbus.SMBus(1) 
 
@@ -1275,14 +1286,22 @@ def readMagnetometerLSM303C():
         Y =  twos_comp((value[3] << 8) | value[2], 16)
         Z =  twos_comp((value[5] << 8) | value[4], 16)
 
-        X = round((X + 392.5) * 5000/5887, 0)
-        Y = round((Y - 145.5) * 5000/5885, 0)
-        Z =  round((Z + 3839)* 5000/6591, 0)
-
+        if allowcalibration:
+            X = round((X + compassOffset[0]) * compassScale[0], 0)
+            Y = round((Y - compassOffset[1]) * compassScale[1], 0)
+            Z = round((Z + compassOffset[1])* compassScale[2], 0)
+       
         return [X, Y, Z]
     except:
         enabledLSM303C = False
         return [0, 0, 0]
+
+def computeCompassHeading():
+    values = readMagnetometerLSM303C()
+
+    heading = math.atan2(values[0],values[1])*(180/math.pi) + 180
+
+    return heading
 
 
 def reaAccelerometerLSM303C():
@@ -1794,24 +1813,27 @@ def calibrateCompass(data):
 def loadCompassCalibration():
     offset = None
     scale = None
-    f = open("/mnt/data/compasscalibration.txt", 'r')
-    x = f.readline()
-    f.close()
+    try:
+        f = open("/mnt/data/compasscalibration.txt", 'r')
+        x = f.readline()
+        f.close()
 
-    values = x.split(",")
+        values = x.split(",")
 
-    if len(values) == 6:
-        offset = [values[0], values[1], values[2]]
-        scale = [values[3], values[4], values[5]]
+        if len(values) == 6:
+            offset = [values[0], values[1], values[2]]
+            scale = [values[3], values[4], values[5]]
 
-    if offset is not None and scale is not None:
-        global compassOffset
-        global compassScale
+        if offset is not None and scale is not None:
+            global compassOffset
+            global compassScale
 
-        compassOffset = offset
-        compassScale = scale
+            compassOffset = offset
+            compassScale = scale
 
-        return [offset, scale]
+            return [offset, scale]
+    except:
+        pass
 
     return None
 
@@ -1852,7 +1874,7 @@ def calibrateCompassGame():
     data = []
 
     while not done:
-        magvalues =  readMagnetometerLSM303C()
+        magvalues =  readMagnetometerLSM303C(False)
         accelvalues =  reaAccelerometerLSM303C()
 
         x_accel = accelvalues[0]
