@@ -250,7 +250,7 @@ var getQuickPiConnection = function (userName, _onConnect, _onDisconnect) {
         this.wsSession.send(JSON.stringify(command));
     }
 
-    this.sendCommand = function (command, callback) {
+    this.sendCommand = function (command, callback, long) {
         if (this.wsSession != null) {
             if (this.resultsCallback == null) {
                 if (!this.commandMode) {
@@ -266,7 +266,8 @@ var getQuickPiConnection = function (userName, _onConnect, _onDisconnect) {
                     {
                         "command": "execLine",
                         "line": command,
-                        "seq": seq
+                        "seq": seq,
+                        "long": long? true: false
                     }
 
                     this.sessionTainted = true;
@@ -380,14 +381,16 @@ def cleanupPin(pin):
 
 def changePinState(pin, state):
     pin = normalizePin(pin)
-    state = int(state)
 
-    cleanupPin(pin)
-    GPIO.setup(pin, GPIO.OUT)
-    if state:
-        GPIO.output(pin, GPIO.HIGH)
-    else:
-        GPIO.output(pin, GPIO.LOW)
+    if pin != 0:
+        state = int(state)
+
+        cleanupPin(pin)
+        GPIO.setup(pin, GPIO.OUT)
+        if state:
+            GPIO.output(pin, GPIO.HIGH)
+        else:
+            GPIO.output(pin, GPIO.LOW)
 
 def turnLedOn(pin=5):
 	changePinState(pin, 1)
@@ -1165,10 +1168,12 @@ def readGyroBMI160():
             initBMI160()
         
         bus = smbus.SMBus(1)
-        value = bus.read_i2c_block_data(BMI160_DEVICE_ADDRESS, BMI160_USER_DATA_8_ADDR, 6)
+        value = bus.read_i2c_block_data(BMI160_DEVICE_ADDRESS, BMI160_USER_DATA_8_ADDR, 15)
         x =  (value[1] << 8) | value[0]
         y =  (value[3] << 8) | value[2]
         z =  (value[5] << 8) | value[4]
+
+        time = (value[14] << 16) | (value[13] << 8) | value[12]
 
         if x & 0x8000 != 0:
             x -= 1 << 16
@@ -1179,11 +1184,11 @@ def readGyroBMI160():
         if z & 0x8000 != 0:
             z -= 1 << 16
 
-        #x = float(x)  / 16384.0;
-        #y = float(y)  / 16384.0;
-        #z = float(z) / 16384.0;
-  
-        return [x, y, z]
+        x = float(x)  * 0.030517578125;
+        y = float(y)  * 0.030517578125;
+        z = float(z)  * 0.030517578125;
+      
+        return [x, y, z, time]
     except:
         enabledBMI160 = False
         return [0, 0, 0]
@@ -1261,7 +1266,7 @@ def initLSM303C():
     bus.write_byte_data(ACC_I2C_ADDR, CTRL_REG1_A, 0xBF) # High resolution, 100Hz output, enable all three axis
 
 
-def readMagnetometerLSM303C(allowcalibration=True):
+def readMagnetometerLSM303C(allowcalibration=True, calibratedvalues=True):
     global enabledLSM303C
     global compassOffset
     global compassScale
@@ -1286,10 +1291,10 @@ def readMagnetometerLSM303C(allowcalibration=True):
         Y =  twos_comp((value[3] << 8) | value[2], 16)
         Z =  twos_comp((value[5] << 8) | value[4], 16)
 
-        if allowcalibration:
+        if (compassOffset is not None) and (compassScale is not None) and calibratedvalues:
             X = round((X + compassOffset[0]) * compassScale[0], 0)
-            Y = round((Y - compassOffset[1]) * compassScale[1], 0)
-            Z = round((Z + compassOffset[1])* compassScale[2], 0)
+            Y = round((Y + compassOffset[1]) * compassScale[1], 0)
+            Z = round((Z + compassOffset[2])* compassScale[2], 0)
        
         return [X, Y, Z]
     except:
@@ -1364,26 +1369,28 @@ def readStick(pinup, pindown, pinleft, pinright, pincenter):
 
 def setInfraredState(pin, state):
     pin = normalizePin(pin)
-    state = int(state)
 
-    cleanupPin(pin)
+    if pin != 0:
+        state = int(state)
 
-    pi.set_mode(pin, pigpio.OUTPUT)
+        cleanupPin(pin)
 
-    pi.wave_clear()
-    pi.wave_tx_stop()
+        pi.set_mode(pin, pigpio.OUTPUT)
 
-    if state:
-        wf = []
+        pi.wave_clear()
+        pi.wave_tx_stop()
 
-        wf.append(pigpio.pulse(1<<pin, 0, 13))
-        wf.append(pigpio.pulse(0, 1<<pin, 13))
+        if state:
+            wf = []
 
-        pi.wave_add_generic(wf)
+            wf.append(pigpio.pulse(1<<pin, 0, 13))
+            wf.append(pigpio.pulse(0, 1<<pin, 13))
 
-        a = pi.wave_create()
+            pi.wave_add_generic(wf)
 
-        pi.wave_send_repeat(a)
+            a = pi.wave_create()
+
+            pi.wave_send_repeat(a)
 
 def changeActiveBuzzerState(pin, state):
     changePinState(pin, state)
@@ -1772,7 +1779,7 @@ def approximateCentre(data):
 		centre[i] = int(centre[i] / samples)
 
 
-	print("centre", centre)
+	#print("centre", centre)
 
 	c = centre
 	best = [0, 0, 0]
@@ -1800,7 +1807,7 @@ def approximateCentre(data):
 			#print("best is equal to centre", best, c)
 			break
 
-		print(best)
+		#print(best)
 		c = best
 
 	return c
@@ -1821,8 +1828,8 @@ def loadCompassCalibration():
         values = x.split(",")
 
         if len(values) == 6:
-            offset = [values[0], values[1], values[2]]
-            scale = [values[3], values[4], values[5]]
+            offset = [float(values[0]), float(values[1]), float(values[2])]
+            scale = [float(values[3]), float(values[4]), float(values[5])]
 
         if offset is not None and scale is not None:
             global compassOffset
@@ -1837,7 +1844,7 @@ def loadCompassCalibration():
 
     return None
 
-def saveCompassCalibration(offset, scale):
+def saveCompassCalibration(scale, offset):
     f = open("/mnt/data/compasscalibration.txt", "w+")
 
     f.write(str(offset[0]) + ","
@@ -1845,7 +1852,7 @@ def saveCompassCalibration(offset, scale):
              + str(offset[2]) + ","
              + str(scale[0]) + ","
              + str(scale[1]) + ","
-             + str(scale[2]))
+             + str(scale[2]) + "\\n")
 
     f.close()
 
@@ -1873,8 +1880,9 @@ def calibrateCompassGame():
 
     data = []
 
-    while not done:
-        magvalues =  readMagnetometerLSM303C(False)
+    start = time.time()
+    while not done and (time.time() - start) < 30:
+        magvalues =  readMagnetometerLSM303C(False, False)
         accelvalues =  reaAccelerometerLSM303C()
 
         x_accel = accelvalues[0]
@@ -1918,7 +1926,6 @@ def calibrateCompassGame():
                 drawRectangle((x * scale) + rect_offset_x,
 					        (y * scale) + rect_offset_y,
                             scale, scale)
-        print(".")
         updateScreen()
 
     result = calibrateCompass(data)
@@ -1930,5 +1937,72 @@ def calibrateCompassGame():
 
     compassOffset = result[0]
     compassScale = result[1]
+
+gyro_angles = [0, 0, 0]
+gyro_calibration = [0, 0, 0]
+stop_gyro = False
+gyro_thread = None
+gyro_angles_lock = None
+    
+def setGyroZeroAngle():
+    global angles
+    global calibration
+    global gyro_thread
+    global gyro_angles_lock
+
+    if gyro_thread is None:
+        gyro_angles = [0, 0, 0]
+        calibrationsamples = 500
+        samples = 0
+        while samples < calibrationsamples:
+            values = readGyroBMI160()
+
+            gyro_calibration[0] += values[0]
+            gyro_calibration[1] += values[1]
+            gyro_calibration[2] += values[2]
+            samples += 1
+
+        gyro_calibration[0] /= samples
+        gyro_calibration[1] /= samples
+        gyro_calibration[2] /= samples
+
+        gyro_angles_lock = threading.Lock()
+
+        gyro_thread = threading.Thread(target=gyroThread)
+        gyro_thread.start()
+    else:
+        gyro_angles_lock.acquire(True)
+        angles = [0, 0, 0]
+        gyro_angles_lock.release()
+
+
+def computeRotationGyro():
+    global gyro_angles
+
+    return [int(gyro_angles[0]), int(gyro_angles[1]), int(gyro_angles[2])]
+
+def gyroThread():
+    global gyro_angles
+    global gyro_calibration
+    global stop_gyro
+
+    lasttime = readGyroBMI160()[3]
+    start = time.time()
+
+    while True:
+        if stop_gyro:
+            break
+        values = readGyroBMI160()
+
+        dt = (values[3] - lasttime) * 3.9e-5
+        lasttime = values[3]
+
+        gyro_angles_lock.acquire(True)
+        gyro_angles[0] += (values[0] - gyro_calibration[0]) * dt
+        gyro_angles[1] += (values[1] - gyro_calibration[1]) * dt
+        gyro_angles[2] += (values[2] - gyro_calibration[2]) * dt
+        gyro_angles_lock.release()
+
+
 
 `

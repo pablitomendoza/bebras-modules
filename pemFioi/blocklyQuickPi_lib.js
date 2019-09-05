@@ -54,8 +54,10 @@ var getContext = function (display, infos, curLevel) {
                 readInfraredState: "Read Infrared Receiver State %1",
                 setInfraredState: "Set Infrared transmiter State %1",
 
-
-
+                // Gyroscope
+                readAngularVelocity: "Read angular velocity (°/s) %1",
+                setGyroZeroAngle: "Set the gyroscope zero point",
+                computeRotationGyro: "Compute rotation in the gyroscope %1",
 
                 /*turnLedOn: "Turn Led On",
                 turnLedOff: "Turn Led Off",
@@ -121,6 +123,11 @@ var getContext = function (display, infos, curLevel) {
                 setInfraredState: "setInfraredState",
 
 
+                // Gyroscope
+                readAngularVelocity: "readAngularVelocity",
+                setGyroZeroAngle: "setGyroZeroAngle",
+                computeRotationGyro: "computeRotationGyro",
+
             },
             description: {
                 // Descriptions of the functions in Python (optional)
@@ -170,6 +177,10 @@ var getContext = function (display, infos, curLevel) {
                 readInfraredState: "readInfraredState()",
                 setInfraredState: "setInfraredState()",
 
+                // Gyroscope
+                readAngularVelocity: "readAngularVelocity()",
+                setGyroZeroAngle: "setGyroZeroAngle()",
+                computeRotationGyro: "computeRotationGyro()",
             },
             constant: {
             },
@@ -316,6 +327,12 @@ var getContext = function (display, infos, curLevel) {
 
                 readInfraredState: "readInfraredState",
                 setInfraredState: "setInfraredState",
+
+                // Gyroscope
+                readAngularVelocity: "readAngularVelocity",
+                setGyroZeroAngle: "setGyroZeroAngle",
+                computeRotationGyro: "computeRotationGyro",
+
             }
         }
     }
@@ -5086,7 +5103,7 @@ var getContext = function (display, infos, curLevel) {
                 returnVal = Math.floor(returnVal);
 
                 cb(returnVal);
-            });
+            }, true);
         }
     };
     
@@ -5108,7 +5125,7 @@ var getContext = function (display, infos, curLevel) {
         }
     };
 
-    context.quickpi.setInfraredState = function (sensor, state, callback) {
+    context.quickpi.setInfraredState = function (name, state, callback) {
         var sensor = findSensorByName(name);
 
         context.registerQuickPiEvent(name, state ? true : false);
@@ -5119,7 +5136,72 @@ var getContext = function (display, infos, curLevel) {
             var cb = context.runner.waitCallback(callback);
             
             findSensorDefinition(sensor).setLiveState(sensor, state, cb);
+        }
+    };
 
+
+    //// Gyroscope
+    context.quickpi.readAngularVelocity = function (axis, callback) {
+        if (!context.display || context.autoGrading || context.offLineMode) {
+            var state = context.getSensorState("gyroscope", "i2c");
+
+            context.runner.noDelay(callback, state);
+        } else {
+            var cb = context.runner.waitCallback(callback);
+            var sensor = context.findSensor("gyroscope", "i2c");
+            
+            findSensorDefinition(sensor).getLiveState(axis, function(returnVal) {
+                sensor.state = returnVal;
+                drawSensor(sensor);
+
+                if (axis == "x")
+                    returnVal = returnVal[0];
+                else if (axis == "y")
+                    returnVal = returnVal[1];
+                else if (axis == "z")
+                    returnVal = returnVal[2];
+
+                cb(returnVal);
+            });
+        }
+    };
+
+    context.quickpi.setGyroZeroAngle = function (callback) {
+        if (!context.display || context.autoGrading || context.offLineMode) {
+            context.runner.noDelay(callback);
+        } else {
+            var cb = context.runner.waitCallback(callback);
+            
+            context.quickPiConnection.sendCommand("setGyroZeroAngle()", function(returnVal) {
+                cb();
+            }, true);
+        }
+    };
+
+    context.quickpi.computeRotationGyro = function (axis, callback) {
+        if (!context.display || context.autoGrading || context.offLineMode) {
+            var state = context.getSensorState("gyroscope", "i2c");
+
+            context.runner.noDelay(callback, 0);
+        } else {
+            var cb = context.runner.waitCallback(callback);
+            var sensor = context.findSensor("gyroscope", "i2c");
+            
+            context.quickPiConnection.sendCommand("computeRotationGyro()", function(returnVal) {
+                //sensor.state = returnVal;
+                //drawSensor(sensor);
+
+                var returnVal = JSON.parse(returnVal);
+
+                if (axis == "x")
+                    returnVal = returnVal[0];
+                else if (axis == "y")
+                    returnVal = returnVal[1];
+                else if (axis == "z")
+                    returnVal = returnVal[2];
+
+                cb(returnVal);
+            }, true);
         }
     };
 
@@ -5378,6 +5460,27 @@ var getContext = function (display, infos, curLevel) {
                         "args0": [
                             {
                                 "type": "field_dropdown", "name": "PARAM_0", "options": getSensorNames("irrecv")
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "readAngularVelocity", yieldsValue: true, params: ["String"], blocklyJson: {
+                        "args0": [
+                            {
+                                "type": "field_dropdown", "name": "PARAM_0", "options": [["x", "x"], ["y", "y"], ["z", "z"] ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "setGyroZeroAngle"
+                },
+                {
+                    name: "computeRotationGyro", yieldsValue: true, params: ["String"], blocklyJson: {
+                        "args0": [
+                            {
+                                "type": "field_dropdown", "name": "PARAM_0", "options": [["x", "x"], ["y", "y"], ["z", "z"] ]
                             }
                         ]
                     }
