@@ -1,6 +1,6 @@
 g_instance = null;
 
-var getQuickPiConnection = function (userName, _onConnect, _onDisconnect) {
+var getQuickPiConnection = function (userName, _onConnect, _onDisconnect, _onChangeBoard) {
     this.onConnect = _onConnect;
     this.onDisconnect = _onDisconnect;
 
@@ -18,6 +18,7 @@ var getQuickPiConnection = function (userName, _onConnect, _onDisconnect) {
     this.connected = false;
     this.onConnect = _onConnect;
     this.onDisconnect = _onDisconnect;
+    this.onChangeBoard = _onChangeBoard;
     this.locked = "";
     this.pingInterval = null;
     this.pingsWithoutPong = 0;
@@ -74,6 +75,12 @@ var getQuickPiConnection = function (userName, _onConnect, _onDisconnect) {
         this.wsSession.onmessage = function (evt) {
             var message = JSON.parse(evt.data);
 
+            if (message.command == "hello") {
+                if (onChangeBoard && message.board)
+                {
+                   onChangeBoard(message.board);
+                }
+            }
             if (message.command == "locked") {
                 locked = message.lockedby;
             } else if (message.command == "pong") {

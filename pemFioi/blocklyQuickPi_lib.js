@@ -362,7 +362,7 @@ var getContext = function (display, infos, curLevel) {
     if(window.getQuickPiConnection) {
         // Only if the quickpi connection lib is imported
         // Allows to load the context for documentation purposes as well
-        context.quickPiConnection = getQuickPiConnection(lockstring, raspberryPiConnected, raspberryPiDisconnected);
+        context.quickPiConnection = getQuickPiConnection(lockstring, raspberryPiConnected, raspberryPiDisconnected, raspberryPiChangeBoard);
     }
     var orange = false;
     var paper;
@@ -671,7 +671,7 @@ var getContext = function (display, infos, curLevel) {
     if (sessionStorage.board)
         context.board = sessionStorage.board;
     else
-        context.board = "quickpi";
+        context.board = "unknow";
 
     var boardDefinitions = [
         {
@@ -1322,6 +1322,9 @@ var getContext = function (display, infos, curLevel) {
                 context.quickPiConnection.sendCommand("readGyroBMI160()", function(val) {
 
                     var array = JSON.parse(val);
+                    array[0] = Math.round(array[0]);
+                    array[1] = Math.round(array[1]);
+                    array[2] = Math.round(array[2]);
                     callback(array);
                 });
             },
@@ -1940,50 +1943,7 @@ var getContext = function (display, infos, curLevel) {
                     $('#popupMessage').hide();
                     window.displayHelper.popupMessageShown = false;
 
-                    context.board = board.name;
-                    sessionStorage.board = board.name;
-
-                    if (infos.customSensors) {
-                        for (var i = 0; i < infos.quickPiSensors.length; i++) {
-                            var sensor = infos.quickPiSensors[i];
-                            sensor.removed = true;
-                        }   
-                        infos.quickPiSensors = [];
-
-                        if (board.builtinSensors) {
-                            for (var i = 0; i < board.builtinSensors.length; i++) {
-                                var sensor = board.builtinSensors[i];
-
-                                var newSensor = {
-                                    "type": sensor.type,
-                                    "port": sensor.port,
-                                    "builtin": true,
-                                };
-
-                                if (sensor.subType) {
-                                    newSensor.subType = sensor.subType;
-                                }
-
-                                newSensor.name = getSensorSuggestedName(sensor.type, sensor.suggestedName);
-
-                                sensor.state = null;
-                                sensor.lastState = 0;
-                                sensor.lastStateChange = null;
-                                sensor.callsInTimeSlot = 0;
-                                sensor.lastTimeIncrease = 0;
-
-                                infos.quickPiSensors.push(newSensor);
-                            }
-                        }
-                    } else {
-                        for (var i = 0; i < infos.quickPiSensors.length; i++) {
-                            var sensor = infos.quickPiSensors[i];
-                            sensorAssignPort(sensor);
-                        }   
-                    }
-
-                    context.resetSensorTable();
-                    context.resetDisplay();
+                    context.changeBoard(board.name);
                 }
             }
         });
@@ -2460,6 +2420,72 @@ var getContext = function (display, infos, curLevel) {
 
     }
 
+    function raspberryPiChangeBoard(board) {
+        context.changeBoard(board);
+    }
+
+
+    context.changeBoard = function(newboardname)
+    {
+        if (context.board == newboardname)
+            return;
+
+        var board = null;
+        for (var i = 0; i < boardDefinitions.length; i++) {
+            board = boardDefinitions[i];
+
+            if (board.name == newboardname)
+                break;
+        }
+
+        if (board == null)
+            return;
+
+        context.board = newboardname;
+        sessionStorage.board = newboardname;
+
+        if (infos.customSensors) {
+            for (var i = 0; i < infos.quickPiSensors.length; i++) {
+                var sensor = infos.quickPiSensors[i];
+                sensor.removed = true;
+            }   
+            infos.quickPiSensors = [];
+
+            if (board.builtinSensors) {
+                for (var i = 0; i < board.builtinSensors.length; i++) {
+                    var sensor = board.builtinSensors[i];
+
+                    var newSensor = {
+                        "type": sensor.type,
+                        "port": sensor.port,
+                        "builtin": true,
+                    };
+
+                    if (sensor.subType) {
+                        newSensor.subType = sensor.subType;
+                    }
+
+                    newSensor.name = getSensorSuggestedName(sensor.type, sensor.suggestedName);
+
+                    sensor.state = null;
+                    sensor.lastState = 0;
+                    sensor.lastStateChange = null;
+                    sensor.callsInTimeSlot = 0;
+                    sensor.lastTimeIncrease = 0;
+
+                    infos.quickPiSensors.push(newSensor);
+                }
+            }
+        } else {
+            for (var i = 0; i < infos.quickPiSensors.length; i++) {
+                var sensor = infos.quickPiSensors[i];
+                sensorAssignPort(sensor);
+            }   
+        }
+
+        context.resetSensorTable();
+        context.resetDisplay();
+    };
 
     // Update the context's display to the new scale (after a window resize for instance)
     context.updateScale = function () {
@@ -3744,7 +3770,7 @@ var getContext = function (display, infos, curLevel) {
 
             if (sensor.state) {
                 try {
-                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + "\nY: " + sensor.state[1] + "\nZ: " + sensor.state[2]);
+                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + "g\nY: " + sensor.state[1] + "g\nZ: " + sensor.state[2] + "g");
                 } catch (Err)
                 {
                     var a = 1;
@@ -3767,7 +3793,7 @@ var getContext = function (display, infos, curLevel) {
                 sensor.stateText.remove();
 
             if (sensor.state) {
-                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + "\nY: " + sensor.state[1] + "\nZ: " + sensor.state[2]);
+                sensor.stateText = paper.text(state1x, state1y, "X: " + sensor.state[0] + "°/s\nY: " + sensor.state[1] + "°/s\nZ: " + sensor.state[2] + "°/s");
             }
         } else if (sensor.type == "magnetometer") {
             if (sensor.stateText)
