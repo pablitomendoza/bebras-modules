@@ -276,17 +276,20 @@ function PaperMouseEvent(paperElementID, paper, jqEvent, callback, enabled,id) {
       }
       this.enabled = enabled;
       if(enabled) {
+         // $("#" + paperElementID).unbind(jqEvent, this.clickHandler);
+         $("#" + paperElementID).off(jqEvent);
          $("#" + paperElementID)[jqEvent](this.clickHandler);
       }
       else {
          $("#" + paperElementID).unbind(jqEvent, this.clickHandler);
+         $("#" + paperElementID).off(jqEvent);
       }
    };
 
    this.clickHandler = function(event) {
       // console.log(jqEvent+" "+id);
-      var offset = $(self.paper.canvas).offset();
-      // var offset = $("#"+paperElementID).offset();
+      // var offset = $(self.paper.canvas).offset();
+      var offset = $("#"+paperElementID).offset();
       var xPos = event.pageX - offset.left;
       var yPos = event.pageY - offset.top;
       callback(xPos, yPos, event);
@@ -543,7 +546,10 @@ function EdgeCreator(id, paperElementID, paper, graph, visualGraph, graphMouse, 
    }
 }
 
-function FuzzyClicker(id, paperElementID, paper, graph, visualGraph, callback, forVertices, forEdges, forBackground, vertexThreshold, edgeThreshold, enabled, event = "click") {
+function FuzzyClicker(id, paperElementID, paper, graph, visualGraph, callback, forVertices, forEdges, forBackground, vertexThreshold, edgeThreshold, enabled, event) {
+   if(!event){
+      event = "click";
+   }
    var self = this;
    this.id = id;
    this.graph = graph;
@@ -607,11 +613,10 @@ function FuzzyClicker(id, paperElementID, paper, graph, visualGraph, callback, f
       var minDistance = Infinity;
       this.graph.forEachVertex(function(id) {
          var distance = visualGraph.graphDrawer.getDistanceFromVertex(id, xPos, yPos);
-         // console.log(distance+" "+vertexThreshold);
          if(distance <= vertexThreshold && distance < minDistance) {
             vertex = id;
             minDistance = distance;
-
+            // console.log(id);
          }
       });
       return vertex;
@@ -738,7 +743,7 @@ function VertexDragAndConnect(settings) {
    var graph = settings.graph;
    this.visualGraph = settings.visualGraph;
    var graphMouse = settings.graphMouse;
-   var dragThreshold = settings.dragThreshold;
+   this.dragThreshold = settings.dragThreshold;
    this.vertexThreshold = settings.vertexThreshold || 0;
    this.dragLimits = settings.dragLimits;
    this.onVertexSelect = settings.onVertexSelect;
@@ -868,6 +873,7 @@ function VertexDragAndConnect(settings) {
    };
 
    this.moveHandler = function(dx, dy, x, y, event) {
+      // console.log(dragThreshold)
       if(dx == 0 && dy == 0){
          return;
       }
@@ -875,7 +881,7 @@ function VertexDragAndConnect(settings) {
          self.onVertexSelect(self.selectionParent, false);
       }
       self.selectionParent = null;
-      if(!self.isDragging && dx * dx + dy * dy >= dragThreshold * dragThreshold) {
+      if(!self.isDragging && dx * dx + dy * dy >= self.dragThreshold * self.dragThreshold) {
          self.isDragging = true;
       }
       if(!self.isDragging) {
@@ -1281,7 +1287,8 @@ function GraphDragger(settings) {
          };
       });
       if(self.gridEnabled){
-         for(vertex of vertices){
+         for(var iVertex = 0; iVertex < vertices.length; iVertex++){
+            var vertex = vertices[iVertex];
             var pos = self.visualGraph.graphDrawer.getVertexPosition(vertex);
             var index = pos.x % self.gridX + ";" + pos.y % self.gridY;
             var maxLength = 0;
@@ -1308,7 +1315,8 @@ function GraphDragger(settings) {
          var dx = x - self.mouseInitPos.x;
          var dy = y - self.mouseInitPos.y;
          if(self.gridEnabled){
-            for(vertPos of self.vertInitPos){
+            for(var iVert = 0; iVert < self.vertInitPos.length; iVert++){
+               var vertPos = self.vertInitPos[iVert];
                if($.inArray(vertPos.id,self.gridAlignment[self.gridAlignmentRefIndex]) >= 0){
                   var newX = (vertPos.position.x + dx) - (vertPos.position.x + dx) % self.gridX;
                   var newY = (vertPos.position.y + dy) - (vertPos.position.y + dy) % self.gridY;
@@ -1546,7 +1554,8 @@ function GraphEditor(settings) {
    this.setTableMode = function(enabled) {
       this.tableMode = enabled;
       var vertices = graph.getAllVertices();
-      for(var vertex of vertices){
+      for(var iVertex = 0; iVertex < vertices.length; iVertex++){
+         var vertex = vertices[iVertex];
          var vInfo = visualGraph.getVertexVisualInfo(vertex);
          vInfo.tableMode = enabled;
       }
@@ -1668,10 +1677,10 @@ function GraphEditor(settings) {
          }
          return;
       }
-      
+
       if(selected){
          edge[0].attr(selectedEdgeAttr);
-         
+
          self.addEdgeCross(edgeID);
          var info = graph.getEdgeInfo(edgeID);
          if(info.label.length == 0)
@@ -1716,7 +1725,8 @@ function GraphEditor(settings) {
       var index = 0;
       do{
          var alreadyExist = false;
-         for(var vertex of vertices){
+         for(var iVertex = 0; iVertex < vertices.length; iVertex++){
+            var vertex = vertices[iVertex];
             var info = graph.getVertexInfo(vertex);
             var label = this.vertexLabelPrefix + index;
             if(info.label == label){
@@ -1813,12 +1823,14 @@ function GraphEditor(settings) {
                var neighbors1 = graph.getNeighbors(id1);
                var neighbors2 = graph.getNeighbors(id2);
                var neighbors = neighbors1.concat(neighbors2);
-               for(var neighbor of neighbors){
+               for(var iNeighbor = 0; iNeighbor < neighbors.length; iNeighbor++){
+                  var neighbor = neighbors[iNeighbor];
                   if(neighbor != id1 && neighbor != id2 && areAligned(id1,id2,neighbor)){
                      var edges1 = graph.getEdgesBetween(id1,neighbor);
                      var edges2 = graph.getEdgesBetween(id2,neighbor);
                      var edges3 = edges1.concat(edges2);
-                     for(var edge of edges3){
+                     for(var iEdge = 0; iEdge < edges3.length; iEdge++){
+                        var edge = edges3[iEdge];
                         var vInfo = visualGraph.getEdgeVisualInfo(edge);
                         if(!vInfo["radius-ratio"]){
                            validParameters = false;
@@ -2632,7 +2644,8 @@ function GraphEditor(settings) {
          var content = info.content || "";
          var boxSize = visualGraph.graphDrawer.getBoxSize(content);
       }
-      for(vertex of vertices){
+      for(var iVertex = 0; iVertex < vertices.length; iVertex++){
+         var vertex = vertices[iVertex];
          if(vertex != vID){
             var vInfo2 = visualGraph.getVertexVisualInfo(vertex);
             if(vInfo2.tableMode){

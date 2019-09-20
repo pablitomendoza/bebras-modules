@@ -170,7 +170,8 @@ var getContext = function(display, infos, curLevel) {
                failureWireCrossing: "Impossible de relier ces deux prises, deux câbles vont s'intersecter !",
                failureWireTooLong: "Impossible de relier ces deux prises car elles sont trop éloignées !",
                failureTotalLengthExceeded: "Vous n'avez pas assez de longueur de câble pour relier ces deux prises !",
-               failureProjectile: "Le robot s'est pris un projectile !"
+               failureProjectile: "Le robot s'est pris un projectile !",
+               failureRewrite: "Le robot a essayé de repeindre une case."
             },
             startingBlockName: "Programme du robot"
          },
@@ -1777,11 +1778,12 @@ var getContext = function(display, infos, curLevel) {
            count: 200,
            type: "paint"
          },
+         ignoreBag: true,
          backgroundColor: "#ffbf5e",
          itemTypes: {
             red_robot: { img: "red_robot.png", side: 90, nbStates: 1, isRobot: true, offsetX: -15, offsetY: 15, zOrder: 3 },
             initialPaint: { num: 2, color: "#2e1de5", side: 60, isPaint: true, zOrder: 1 },
-            marker: { num: 3, img: "marker.png", side: 60, isContainer: true, zOrder: 0 },
+            marker: { num: 3, img: "marker.png", side: 60, isContainer: true, containerFilter: function(item) {return item.type === "paint";}, zOrder: 0 },
             marker_white: { num: 4, img: "marker_white.png", isContainer: true, isFake: true, side: 60, zOrder: 0 },
             paint: { color: "#2e1de5", side: 60, isWithdrawable: true, zOrder: 1 },
             number: { side: 60, zOrder: 2 },
@@ -1810,7 +1812,13 @@ var getContext = function(display, infos, curLevel) {
                   },
                   func: (function(cur_color) { return function(callback) {
                      var robot = this.getRobot();
-                     this.withdraw(undefined, false);
+                     if(infos.allowRewrite === true) {
+                        this.withdraw(undefined, false);
+                     }
+                     else if(this.isOn(function(obj) { return obj.isWithdrawable === true;})) {
+                        throw(window.languageStrings.messages.failureRewrite);
+                     }
+                     
                      this.dropObject({type: "paint", color: cur_color});
                      if (robot.col == context.nbCols - 1) {
                         robot.row = (robot.row + 1) % context.nbRows;
@@ -1833,7 +1841,7 @@ var getContext = function(display, infos, curLevel) {
          ignoreBag: true,
          itemTypes: {
             green_robot: { img: "cursor.png", side: 60, nbStates: 9, isRobot: true, zOrder: 2 },
-            marker_red: { num: 2, side: 60, isContainer: true, zOrder: 0, containerFilter: function(item) {return item.color === "#ff0000";}  },
+            marker_red: { num: 2, side: 60, isContainer: true, zOrder: 0, containerFilter: function(item) {return item.color === "#ff0000";} },
             marker_blue: { num: 3, side: 60, isContainer: true, zOrder: 0, containerFilter: function(item) {return item.color === "#0000ff";} },
             marker_yellow: { num: 4, side: 60, isContainer: true, zOrder: 0, containerFilter: function(item) {return item.color === "#ffff00";} },
             marker_white: { num: 5, side: 60, isContainer: true, zOrder: 0, containerFilter: function(item) {return item.color === "#ffffff";} },
@@ -3618,7 +3626,7 @@ var robotEndConditions = {
                else
                   filter = function(obj) { return obj.isWithdrawable === true && container.containerFilter(obj) };
                
-               if(container.containerSize != undefined && context.getItemsOn(row, col, filter).length < container.containerSize) {
+               if(container.containerSize != undefined && context.getItemsOn(row, col, filter).length != container.containerSize) {
                   solved = false;
                   message = Math.min(message, 1);
                }
